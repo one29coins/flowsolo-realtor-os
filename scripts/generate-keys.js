@@ -30,7 +30,7 @@ function segment(len = 4) {
 }
 
 function generateKey() {
-  return `FLOW-${segment()}-${segment()}-${segment()}`
+  return `REAL-${segment()}-${segment()}-${segment()}`
 }
 
 async function generateKeys(count) {
