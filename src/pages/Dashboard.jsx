@@ -1,10 +1,18 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useOutletContext, useNavigate } from 'react-router-dom'
 import {
   Home, Users, TrendingUp, DollarSign, AlertCircle,
-  Calendar, Plus, ArrowRight, Clock, MapPin
+  Calendar, Plus, ArrowRight, Clock, MapPin,
+  Building2, CheckSquare, FolderClosed, MessageCircle, BarChart,
+  RefreshCw, Settings, LogOut, LayoutGrid
 } from 'lucide-react'
 import Topbar from '../components/layout/Topbar'
+import MobileLayout from '../components/layout/MobileLayout'
+import MobileHeader from '../components/layout/MobileHeader'
+import StatRow from '../components/ui/StatRow'
+import ModuleTileGrid from '../components/ui/ModuleTileGrid'
+import SectionList from '../components/ui/SectionList'
+import AlertBanner from '../components/ui/AlertBanner'
 import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
 import EmptyState from '../components/ui/EmptyState'
@@ -70,7 +78,7 @@ function daysUntil(dateStr) {
 export default function Dashboard() {
   const { openSidebar } = useOutletContext()
   const navigate = useNavigate()
-  const { profile } = useAuth()
+  const { profile, signOut } = useAuth()
   const { clients } = useClients()
   const { listings } = useListings()
   const { leads } = useLeads()
@@ -80,6 +88,7 @@ export default function Dashboard() {
   const { transactions } = useTransactions()
 
   const firstName = profile?.full_name?.split(' ')[0] || 'there'
+  const [mobileView, setMobileView] = useState('overview') // 'overview' | 'more'
   const today = toISODate(new Date())
   const now = new Date()
   const currentMonth = now.getMonth()
@@ -193,26 +202,127 @@ export default function Dashboard() {
     return { pipeline, total }
   }, [transactions, listings])
 
+  // ───────── Mobile app shell config ─────────
+  const go = (path) => () => navigate(path)
+  const MOBILE_TABS = [
+    { id: 'overview', label: 'Overview', icon: <Home size={20} /> },
+    { id: '/pipeline', label: 'Leads', icon: <TrendingUp size={20} /> },
+    { id: '/listings', label: 'Listings', icon: <Building2 size={20} /> },
+    { id: '/commissions', label: 'Commission', icon: <DollarSign size={20} /> },
+    { id: 'more', label: 'More', icon: <LayoutGrid size={20} /> },
+  ]
+  const handleMobileTab = (id) => {
+    if (id === 'overview' || id === 'more') setMobileView(id)
+    else navigate(id)
+  }
+  const mobileStats = [
+    { label: 'Active listings', value: String(stats.activeListings) },
+    { label: 'Buyer clients', value: String(stats.activeBuyers) },
+    { label: 'Pipeline leads', value: String(stats.pipelineLeads) },
+    { label: 'Commissions', value: formatCurrency(stats.commissionsThisMonth), variant: stats.commissionsThisMonth === 0 ? 'warning' : 'success' },
+  ]
+  const mobileModuleSections = [
+    { label: 'Pipeline', tiles: [
+      { id: 'pipeline', label: 'Lead Pipeline', featured: true, icon: <TrendingUp size={18} />, onClick: go('/pipeline') },
+      { id: 'listings', label: 'Active Listings', icon: <Building2 size={18} />, onClick: go('/listings') },
+      { id: 'openhouses', label: 'Open Houses', icon: <Calendar size={18} />, onClick: go('/open-houses') },
+      { id: 'showings', label: 'Showing Tracker', icon: <MapPin size={18} />, onClick: go('/showings') },
+    ] },
+    { label: 'Transactions', tiles: [
+      { id: 'transactions', label: 'Transactions', icon: <CheckSquare size={18} />, onClick: go('/transactions') },
+      { id: 'documents', label: 'Document Vault', icon: <FolderClosed size={18} />, onClick: go('/documents') },
+      { id: 'followups', label: 'Client Follow-Ups', icon: <MessageCircle size={18} />, onClick: go('/follow-ups') },
+      { id: 'clients', label: 'Clients', icon: <Users size={18} />, onClick: go('/clients') },
+    ] },
+    { label: 'Finance & Review', tiles: [
+      { id: 'commissions', label: 'Commission Hub', icon: <DollarSign size={18} />, onClick: go('/commissions') },
+      { id: 'market', label: 'Market Analytics', icon: <BarChart size={18} />, onClick: go('/market') },
+      { id: 'weekly', label: 'Weekly Review', icon: <RefreshCw size={18} />, onClick: go('/weekly') },
+    ] },
+  ]
+  const mobileSectionList = [
+    { label: 'Pipeline', items: [
+      { id: 'pipeline', label: 'Lead Pipeline', icon: <TrendingUp size={16} />, onClick: go('/pipeline') },
+      { id: 'listings', label: 'Active Listings', icon: <Building2 size={16} />, onClick: go('/listings') },
+      { id: 'openhouses', label: 'Open Houses', icon: <Calendar size={16} />, onClick: go('/open-houses') },
+      { id: 'showings', label: 'Showing Tracker', icon: <MapPin size={16} />, onClick: go('/showings') },
+    ] },
+    { label: 'Transactions', items: [
+      { id: 'transactions', label: 'Transaction Checklist', icon: <CheckSquare size={16} />, onClick: go('/transactions') },
+      { id: 'documents', label: 'Document Vault', icon: <FolderClosed size={16} />, onClick: go('/documents') },
+      { id: 'followups', label: 'Client Follow-Ups', icon: <MessageCircle size={16} />, onClick: go('/follow-ups') },
+    ] },
+    { label: 'Finance', items: [
+      { id: 'commissions', label: 'Commission Hub', icon: <DollarSign size={16} />, onClick: go('/commissions') },
+      { id: 'market', label: 'Market Analytics', icon: <BarChart size={16} />, onClick: go('/market') },
+    ] },
+    { label: 'Clients & Review', items: [
+      { id: 'clients', label: 'Clients', icon: <Users size={16} />, badge: clients.length || undefined, onClick: go('/clients') },
+      { id: 'weekly', label: 'Weekly Business Review', icon: <RefreshCw size={16} />, onClick: go('/weekly') },
+    ] },
+    { label: 'Account', items: [
+      { id: 'settings', label: 'Settings', icon: <Settings size={16} />, onClick: go('/settings') },
+    ] },
+  ]
+
   return (
     <>
-      <Topbar
-        title="My Realtor Hub"
-        subtitle={`Welcome back, ${firstName} — your real estate business at a glance.`}
-        onMenuClick={openSidebar}
-        actions={
-          <>
-            <Button size="sm" variant="outline" onClick={() => navigate('/pipeline')}>
-              <TrendingUp className="w-4 h-4" /> Lead Pipeline
-            </Button>
-            <Button size="sm" onClick={() => navigate('/listings')}>
-              <Plus className="w-4 h-4" /> New Listing
-            </Button>
-          </>
-        }
-      />
+      {/* ───────── MOBILE: app shell (Overview / All modules) ───────── */}
+      <div className="md:hidden -mx-4 -mt-6 -mb-24">
+        <MobileLayout
+          tabs={MOBILE_TABS}
+          activeTab={mobileView}
+          onTabChange={handleMobileTab}
+          header={
+            <MobileHeader
+              productName="Realtor OS"
+              productEmoji="🏡"
+              userName={profile?.full_name || 'there'}
+              onMenuOpen={() => signOut()}
+              primaryAction={{ label: 'New Listing', onClick: () => navigate('/listings') }}
+            />
+          }
+          content={
+            mobileView === 'more' ? (
+              <SectionList sections={mobileSectionList} />
+            ) : (
+              <>
+                <StatRow stats={mobileStats} />
+                {expiringListings.length > 0 && (
+                  <AlertBanner
+                    variant="warning"
+                    message={`${expiringListings.length} listing${expiringListings.length > 1 ? 's' : ''} expiring soon`}
+                    subtext="Tap to review your active listings"
+                    onPress={() => navigate('/listings')}
+                  />
+                )}
+                <ModuleTileGrid sections={mobileModuleSections} />
+              </>
+            )
+          }
+        />
+      </div>
 
-      {/* ─────── Stat cards ─────── */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6">
+      {/* ───────── DESKTOP: full dashboard ───────── */}
+      <div className="hidden md:block">
+        <Topbar
+          title="My Realtor Hub"
+          subtitle={`Welcome back, ${firstName} — your real estate business at a glance.`}
+          onMenuClick={openSidebar}
+          actions={
+            <>
+              <Button size="sm" variant="outline" onClick={() => navigate('/pipeline')}>
+                <TrendingUp className="w-4 h-4" /> Lead Pipeline
+              </Button>
+              <Button size="sm" onClick={() => navigate('/listings')}>
+                <Plus className="w-4 h-4" /> New Listing
+              </Button>
+            </>
+          }
+        />
+
+      {/* ─────── Stat cards — desktop ─────── */}
+      <div className="hidden md:grid md:grid-cols-4 gap-4 mb-6">
         <Card>
           <Home className="w-5 h-5 text-green-600 mb-3" />
           <div className="text-2xl font-semibold leading-none">{stats.activeListings}</div>
@@ -245,7 +355,7 @@ export default function Dashboard() {
               <h3 className="text-sm font-medium">Active Listings Snapshot</h3>
               <p className="text-xs text-ink-muted mt-0.5">Days on market, status, and showing momentum</p>
             </div>
-            <button onClick={() => navigate('/listings')} className="text-xs text-ink-muted hover:text-ink">View all</button>
+            <button onClick={() => navigate('/listings')} className="text-[13px] font-medium text-[#16a34a] hover:text-[#15803d] py-2 -my-2 flex-shrink-0">View all</button>
           </div>
           {snapshotListings.length === 0 ? (
             <EmptyState
@@ -440,6 +550,7 @@ export default function Dashboard() {
             </>
           )}
         </Card>
+      </div>
       </div>
     </>
   )
