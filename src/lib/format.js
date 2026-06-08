@@ -10,6 +10,16 @@ export function formatCurrency(value) {
   return currencyFormatter.format(n)
 }
 
+// Compact currency for mobile stat cards: 7300 -> "$7.3K", 162000 -> "$162K".
+export function formatCompact(value) {
+  const n = Number(value || 0)
+  const sign = n < 0 ? '-' : ''
+  const abs = Math.abs(n)
+  if (abs >= 1_000_000) return `${sign}$${(abs / 1_000_000).toFixed(1)}M`
+  if (abs >= 1_000) return `${sign}$${(abs / 1_000).toFixed(1)}K`
+  return `${sign}$${abs.toFixed(0)}`
+}
+
 const dateFormatter = new Intl.DateTimeFormat('en-US', {
   month: 'short',
   day: 'numeric',

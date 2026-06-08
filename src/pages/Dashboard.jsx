@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { useOutletContext, useNavigate } from 'react-router-dom'
+import { useOutletContext, useNavigate, useLocation } from 'react-router-dom'
 import {
   Home, Users, TrendingUp, DollarSign, AlertCircle,
   Calendar, Plus, ArrowRight, Clock, MapPin, Menu
@@ -8,6 +8,15 @@ import Topbar from '../components/layout/Topbar'
 import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
 import EmptyState from '../components/ui/EmptyState'
+import MobileHeader from '../components/layout/MobileHeader'
+import BottomTabBar from '../components/layout/BottomTabBar'
+import StatCardGrid from '../components/ui/StatCardGrid'
+import AlertBanner from '../components/ui/AlertBanner'
+import SnapshotList from '../components/ui/SnapshotList'
+import {
+  HomeIcon, UsersIcon, HouseIcon, DollarIcon, DotsIcon,
+  AlertIcon,
+} from '../components/icons'
 import { useClients } from '../hooks/useClients'
 import { useListings } from '../hooks/useListings'
 import { useLeads } from '../hooks/useLeads'
@@ -16,8 +25,18 @@ import { useOpenHouses } from '../hooks/useOpenHouses'
 import { useShowings } from '../hooks/useShowings'
 import { useTransactions } from '../hooks/useTransactions'
 import { useAuth } from '../context/AuthContext'
+import { useIsMobile } from '../hooks/useIsMobile'
 import { LEAD_STAGES } from '../lib/realtorConstants'
-import { formatCurrency, formatDate, toISODate } from '../lib/format'
+import { formatCurrency, formatCompact, formatDate, toISODate } from '../lib/format'
+
+// Bottom tab bar — 5 destinations the user moves between most often on mobile.
+const REALTOR_TABS = [
+  { id: 'home', label: 'Home', icon: <HomeIcon size={20} />, path: '/' },
+  { id: 'leads', label: 'Leads', icon: <UsersIcon size={20} />, path: '/pipeline' },
+  { id: 'listings', label: 'Listings', icon: <HouseIcon size={20} />, path: '/listings' },
+  { id: 'commission', label: 'Commission', icon: <DollarIcon size={20} />, path: '/commissions' },
+  { id: 'more', label: 'More', icon: <DotsIcon size={20} />, path: 'more' },
+]
 
 // Status pill palette (shared with Listings)
 const STATUS_STYLES = {
@@ -70,7 +89,9 @@ function daysUntil(dateStr) {
 export default function Dashboard() {
   const { openSidebar } = useOutletContext()
   const navigate = useNavigate()
-  const { profile } = useAuth()
+  const location = useLocation()
+  const isMobile = useIsMobile()
+  const { profile, user } = useAuth()
   const { clients } = useClients()
   const { listings } = useListings()
   const { leads } = useLeads()
@@ -80,6 +101,7 @@ export default function Dashboard() {
   const { transactions } = useTransactions()
 
   const firstName = profile?.full_name?.split(' ')[0] || 'there'
+  const displayName = profile?.full_name || user?.email?.split('@')[0] || 'Agent'
   const today = toISODate(new Date())
   const now = new Date()
   const currentMonth = now.getMonth()
@@ -192,6 +214,115 @@ export default function Dashboard() {
     const total = pipeline.reduce((s, p) => s + p.estCommission, 0)
     return { pipeline, total }
   }, [transactions, listings])
+
+  // ──────────────────────────────────────────────────────────────────────
+  // Mobile shell (Concept A) — only renders on screens <= 768px.
+  // Desktop rendering below is untouched.
+  // ──────────────────────────────────────────────────────────────────────
+  if (isMobile) {
+    const activeTabId = REALTOR_TABS.find(t => t.path === location.pathname)?.id || 'home'
+
+    const statCards = [
+      {
+        label: 'Active listings',
+        value: String(stats.activeListings),
+        icon: <HouseIcon size={16} />,
+        variant: 'primary',
+      },
+      {
+        label: 'Pipeline leads',
+        value: String(stats.pipelineLeads),
+        icon: <UsersIcon size={16} />,
+        variant: 'default',
+      },
+      {
+        label: 'Active buyers',
+        value: String(stats.activeBuyers),
+        icon: <UsersIcon size={16} />,
+        variant: 'default',
+      },
+      {
+        label: 'Commission MTD',
+        value: formatCompact(stats.commissionsThisMonth),
+        icon: <DollarIcon size={16} />,
+        variant: stats.commissionsThisMonth === 0 ? 'warning' : 'default',
+      },
+    ]
+
+    const snapshotItems = snapshotListings.map(l => {
+      const days = daysOnMarket(l.listing_date, l.days_on_market)
+      const statusColor =
+        l.status === 'Expired' || l.status === 'Withdrawn' ? 'red'
+        : l.status === 'Coming Soon' || l.status === 'Pending' ? 'amber'
+        : 'green'
+      return {
+        id: l.id,
+        name: l.property_address || l.name || 'Untitled listing',
+        subtitle: `${formatCompact(l.list_price)} · ${days}d on market`,
+        status: l.status,
+        statusColor,
+        onEdit: () => navigate('/listings'),
+      }
+    })
+
+    return (
+      <div style={{
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100%',
+        background: 'var(--fs-bg, #f5f5f0)',
+        flex: 1,
+        minHeight: 0,
+      }}>
+        <MobileHeader
+          userName={displayName}
+          productName="FlowSolo Realtor OS"
+          primaryAction={{ label: 'Lead', onClick: () => navigate('/pipeline') }}
+          secondaryAction={{ label: 'Listings', onClick: () => navigate('/listings') }}
+          onMenuOpen={openSidebar}
+        />
+
+        <div style={{
+          flex: 1,
+          overflowY: 'auto',
+          overflowX: 'hidden',
+          WebkitOverflowScrolling: 'touch',
+          paddingBottom: 'calc(56px + var(--safe-bottom, 0px) + 16px)',
+        }}>
+          {expiringListings.length > 0 && (
+            <AlertBanner
+              message={`${expiringListings.length} listing${expiringListings.length > 1 ? 's' : ''} expiring in the next 30 days`}
+              actionLabel="Review"
+              onAction={() => navigate('/follow-ups')}
+            />
+          )}
+
+          <StatCardGrid cards={statCards} />
+
+          <SnapshotList
+            title="Active listings"
+            items={snapshotItems}
+            onViewAll={() => navigate('/listings')}
+            maxVisible={5}
+          />
+        </div>
+
+        <BottomTabBar
+          tabs={REALTOR_TABS}
+          activeTab={activeTabId}
+          onChange={(id) => {
+            const tab = REALTOR_TABS.find(t => t.id === id)
+            if (!tab) return
+            if (tab.path === 'more') {
+              openSidebar()
+              return
+            }
+            navigate(tab.path)
+          }}
+        />
+      </div>
+    )
+  }
 
   return (
     <>
