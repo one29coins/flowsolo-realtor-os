@@ -17,7 +17,7 @@ export function useListings() {
       setLoading(true)
       const { data, error } = await supabase
         .from('projects')
-        .select('*, client:clients(id,name,client_type), seller:clients!projects_seller_id_fkey(id,name,client_type)')
+        .select('*, client:clients!projects_client_id_fkey(id,name,client_type), seller:clients!projects_seller_id_fkey(id,name,client_type)')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
       if (error) throw error
@@ -39,7 +39,7 @@ export function useListings() {
     const { data, error } = await supabase
       .from('projects')
       .insert([{ ...payload, user_id: user.id }])
-      .select('*, client:clients(id,name,client_type), seller:clients!projects_seller_id_fkey(id,name,client_type)')
+      .select('*, client:clients!projects_client_id_fkey(id,name,client_type), seller:clients!projects_seller_id_fkey(id,name,client_type)')
     if (error) throw error
     setListings(prev => [data[0], ...prev])
     return data[0]
@@ -50,7 +50,7 @@ export function useListings() {
       .from('projects')
       .update(updates)
       .eq('id', id)
-      .select('*, client:clients(id,name,client_type), seller:clients!projects_seller_id_fkey(id,name,client_type)')
+      .select('*, client:clients!projects_client_id_fkey(id,name,client_type), seller:clients!projects_seller_id_fkey(id,name,client_type)')
     if (error) throw error
     setListings(prev => prev.map(l => l.id === id ? data[0] : l))
     return data[0]
